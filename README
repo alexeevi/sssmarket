@@ -1,0 +1,76 @@
+*** Requirements ***
+
+1. The Global Beverage Corporation Exchange is a new stock market trading in drinks companies.
+    a. Your company is building the object-oriented system to run that trading.
+    b. You have been assigned to build part of the core object model for a limited phase 1
+2. Provide the source code for an application that will:-
+    a. For a given stock,
+        i. Given any price as input, calculate the dividend yield
+        ii. Given any price as input, calculate the P/E Ratio
+        iii. Record a trade, with timestamp, quantity, buy or sell indicator and price
+        iv. Calculate Volume Weighted Stock Price based on trades in past 5 minutes
+    b. Calculate the GBCE All Share Index using the geometric mean of the Volume Weighted Stock Price for all stocks
+
+
+*** Common Speculations ***
+
+1. Implement a set of classes with only one Facade "entry point" class containing public methods and providing all the required functionality.
+
+2. While currently we have only two types of stocks the straghtforward approach would be to implement single class with couple of if statements.
+   On the other hand, it's likely that there will be some different types in future, therefore it's better to use polymorphism from the beginning.
+
+3. For estimation of Volume Weighted Stock Price it's necessary to keep nominator and denominator of the formula at hand and actualize them on the fly as the trades get added.
+
+4. Calculation of Geometric Mean can be converted from taking a root of multiplication of values into multiplication of roots of values.
+   That would take us away from overflow while keeping within affordable error. Also the root can be replaced by corresponding power operation.
+
+
+*** Interfaces ***
+
+There're two interfaces:
+- Tradeable - declares 4 methods related to a stock or any future kind of instance traded on the market.
+- Market - declares 5 methods enlisted in the task, and also two additional ones for creating stocks of two types.
+
+
+*** Stocks and Trades ***
+
+The package contains abstract class Stock, which implements Tradeable interface.
+In addition to typical getters, it contains concrete implementation of methods getPeRatio() and recordTrade().
+The getDividendYield() method is implemented by child classes, such as CommonStock and PreferredStock.
+The Stock class also contains two list of trades: one for keeping all added trades (for possible usage in the future development) and the TradeQueue,
+which maintains calculation of the Volume Weighted Stock Price based on the trades in the past time interval.
+
+The TradeQueue is initialized by the amount of time in seconds and then receives each new trade for accumulation.
+It always keeps actual sum of trade weights (price x quantity) and sum of quantites, i.e. numerator and denumerator of Volume Weighted Stock Price (VWSP) formula.
+Assuming that calling for getVolumeWeightedPrice() method will occur more rarely than adding new trades the exclusion of old trades occurs on the call of getVolumeWeightedPrice() method,
+or when queue size exceeds internal threshold. The threshold is estimated on queue creation assuming that there will typically be not more than 1000 trades per second.
+In any case freeing the tail of the queue occurs based on difference between timestamp of a trade and current system time.
+
+It worth noting that since it's not specifically covered in the requirement, the VWSP is estimades as 1 - for the stock having no trades history during the applied interval of time.
+This assumption is made in order to prevent getting zero values for VWSP and based on it All Share Index in case of presence of just created or rarely traded stocks.
+
+The Trade class contains only necessary data fields.
+Assumptions are taken that price and quantity won't get values greater than Long type can support.
+On the other hand, all sums and weights related internal variables have BigDecimal type to avoid overflow.
+
+
+*** Market ***
+
+All classes in the package are secured, except for couple of exception classes and SimpleMarket class, which implements Market interface.
+SimpleMarket is intended to live as a singleton. Package visible constructor is declared for testing purposes.
+
+SimpleMarket contains map of stocks key'd by symbol. New stocks can be added to the market using createCommonStock() and createPreferredStock() methods. There's no method for retrieving a stock object.
+Operations of creation of a new stock and calculation of the All Share Index are synchronized upon surrogate object.
+
+The allShareIndex() method iterates set of stocks, retrieves each VWSP with raising into power of (1/stocks.size) and multiplying the value by the accumulator, which is finally returned.
+The iteration is implemented as simple linear loop. Since the calculations are pretty trivial and operate with prepared values, this approach showed order of magnitude faster speed than Map/Reducing.
+
+Finally, it's important to note that SimpleMarket does not throw exception when trying to access stock with unknown symbol. Instead it uses ProxyStock object, which returns zero results.
+On the other hand, StockCreationException is thrown in case of errors occurring during creation of new stocks.
+
+
+*** Author ***
+Ivan Alekseev
+alexeevi@gmail.com
+
+Date: October 7, 2016
